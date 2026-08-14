@@ -76,7 +76,7 @@ export default function EvolveHUD() {
 
       <table className="evo-table">
         <thead>
-          <tr><th>creature</th><th>score</th><th>size</th><th>genome</th></tr>
+          <tr><th>creature</th><th title="Honest score on unseen stories, shown when a life ends. Lower is better; random guessing = 4.25. While training you see % of the life completed.">score</th><th>size</th><th>genome</th></tr>
         </thead>
         <tbody>
           {st.board.map((p) => (
@@ -85,7 +85,7 @@ export default function EvolveHUD() {
                 <span className="evo-dot" style={{ background: lineageColor(p.lineage) }} />
                 {p.champion ? <b className="c-green">champ</b> : "#" + p.id}
               </td>
-              <td>{p.done ? p.valLoss.toFixed(3) : p.step + "/" + st.stepsPerGen}</td>
+              <td>{p.done ? p.valLoss.toFixed(3) : <span className="evo-training" title={"training progress: " + p.step + " of " + st.stepsPerGen + " steps - the real score appears when its life ends"}>{Math.round((100 * p.step) / st.stepsPerGen)}%</span>}</td>
               <td>{fmtParams(p.org.paramCount())}</td>
               <td>K{p.genome.K} E{p.genome.E} H{p.genome.H}</td>
             </tr>
@@ -112,4 +112,5 @@ export default function EvolveHUD() {
     </div>
   );
 }
+
 

@@ -189,3 +189,5 @@ body { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; color: #
 .hud.lingua::-webkit-scrollbar-thumb { background: rgba(110,160,255,.25); border-radius: 3px; }
 .evo-table td { white-space: normal; }
 .evo-best { cursor: help; }
+
+.evo-training { color: #6a7f9e; }
