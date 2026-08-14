@@ -63,30 +63,28 @@ export default function EvolveHUD() {
       <div className="title">EVOLUTION<span className="sub">evolution discovers the architecture - gradient descent does the learning</span></div>
 
       <div className="status-line">
-        generation <b>{st.gen}</b> · creatures scored <b>{st.done}/{st.total}</b> · lifetime budget <b>{st.stepsPerGen}</b> steps · archive <b>{st.archiveSize}</b> proven genomes
+        gen <b>{st.gen}</b> · scored <b>{st.done}/{st.total}</b> · life <b>{st.stepsPerGen}</b> steps · archive <b>{st.archiveSize}</b>
       </div>
 
       {be && (
-        <div className="evo-best">
-          <b className="c-green">best ever</b> (gen {be.gen}, #{be.id}): honest score <b>{be.valLoss.toFixed(3)}</b> with <b>{fmtParams(be.params)}</b> params
-          <span className="tip">The honest score is average surprise per character on stories it NEVER trained on. Random guessing = 4.25. Lower = smarter.</span>
+        <div className="evo-best" title="The honest score is the average surprise per character on stories it NEVER trained on. Random guessing = 4.25. Lower = smarter.">
+          <b className="c-green">best ever</b> gen {be.gen} #{be.id}: <b>{be.valLoss.toFixed(3)}</b> · {fmtParams(be.params)} params
           <br />
-          genome: memory K={be.genome.K} · code E={be.genome.E} · brain H={be.genome.H} · learn rate {be.genome.lr.toFixed(3)}
+          genome K={be.genome.K} E={be.genome.E} H={be.genome.H} lr={be.genome.lr.toFixed(3)}
         </div>
       )}
 
       <table className="evo-table">
         <thead>
-          <tr><th>#</th><th>creature</th><th>honest score</th><th>params</th><th>genome</th></tr>
+          <tr><th>creature</th><th>score</th><th>size</th><th>genome</th></tr>
         </thead>
         <tbody>
-          {st.board.map((p, i) => (
-            <tr key={p.id}>
-              <td>{i + 1}</td>
+          {st.board.map((p) => (
+            <tr key={p.id} title={"creature #" + p.id + " - learn rate " + p.genome.lr.toFixed(3) + (p.done ? " - honest score " + p.valLoss.toFixed(3) : " - still training")}>
               <td><span className="evo-dot" style={{ background: lineageColor(p.lineage) }} />#{p.id}</td>
-              <td>{p.done ? p.valLoss.toFixed(3) : "learning " + p.step + "/" + st.stepsPerGen}</td>
+              <td>{p.done ? p.valLoss.toFixed(3) : p.step + "/" + st.stepsPerGen}</td>
               <td>{fmtParams(p.org.paramCount())}</td>
-              <td>K{p.genome.K} E{p.genome.E} H{p.genome.H} lr{p.genome.lr.toFixed(2)}</td>
+              <td>K{p.genome.K} E{p.genome.E} H{p.genome.H}</td>
             </tr>
           ))}
         </tbody>
@@ -98,12 +96,10 @@ export default function EvolveHUD() {
       <div className="lingua-sample">{st.sample || "(no champion yet - the first generation is still alive)"}</div>
 
       <div className="evo-explain">
-        Each row is one creature. Its genome is only 4 numbers: K = how many past characters it sees,
-        E = size of each character's internal code, H = brain units, lr = how fast it learns.
-        Evolution mutates and recombines these 4 numbers; it never touches the thousands of weights -
-        gradient descent trains those during each creature's life. When a generation dies, the lowest
-        honest scores breed the next one. Color = lineage (family). Height in the 3D view = how far
-        above random guessing; size = parameter count.
+        Genome = 4 numbers only: K memory, E code size, H brain width, lr learn rate.
+        Evolution mutates those; gradient descent trains the weights inside each life.
+        Lowest honest scores breed the next generation.
+        In 3D: color = family, height = skill, size = params. Hover a row for details.
       </div>
 
       <div className="buttons">

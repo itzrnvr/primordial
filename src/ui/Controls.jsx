@@ -68,7 +68,7 @@ export default function Controls() {
           <Slider label="max population" value={p.maxPopulation} min={10} max={HARD_CAP} step={10} onChange={(v) => s.setParam("maxPopulation", v)} format={(v) => String(Math.round(v))}
             help="A hard ceiling on how many cells can exist. Births pause once this is reached. Lowering it below the current count pauses births until deaths thin the herd." />
           <div className="buttons">
-            <button onClick={s.togglePause} title="Freeze or resume the whole universe">{s.paused ? "resume" : "pause"}</button>
+            <button onClick={s.togglePause} title="Freeze or resume the whole universe">{s.paused[s.mode] ? "resume" : "pause"}</button>
             <button className="danger" onClick={s.meteor} title="Kill about 45% of cells at random - a disaster to test how fast life recovers">meteor</button>
             <button onClick={s.reset} title="Start over from LUCA, the very first cell">reset</button>
           </div>
@@ -87,7 +87,7 @@ export default function Controls() {
             turn from noise into words, then sentences.
           </div>
           <div className="buttons">
-            <button onClick={s.togglePause} title="Freeze or resume the organism's learning">{s.paused ? "resume" : "pause"}</button>
+            <button onClick={s.togglePause} title="Freeze or resume the organism's learning">{s.paused[s.mode] ? "resume" : "pause"}</button>
           </div>
         </>
       ) : (
@@ -110,7 +110,7 @@ export default function Controls() {
             on unseen stories decides who breeds.
           </div>
           <div className="buttons">
-            <button onClick={s.togglePause} title="Freeze or resume the evolution">{s.paused ? "resume" : "pause"}</button>
+            <button onClick={s.togglePause} title="Freeze or resume the evolution">{s.paused[s.mode] ? "resume" : "pause"}</button>
             <button onClick={() => resetEvolve()} title="Start over from a fresh random population">reset</button>
           </div>
         </>
@@ -118,3 +118,4 @@ export default function Controls() {
     </div>
   );
 }
+

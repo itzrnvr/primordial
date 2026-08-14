@@ -182,3 +182,10 @@ body { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; color: #
 .evo-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
 .evo-best { position: relative; background: rgba(124,255,178,.06); border: 1px solid rgba(124,255,178,.25); border-radius: 8px; padding: 8px 10px; margin: 6px 0; font-size: 11.5px; line-height: 1.55; }
 .evo-explain { font-size: 10.5px; color: #7d8fb0; line-height: 1.5; margin-top: 6px; }
+
+/* ---- evolution HUD layout fixes ---- */
+.hud.lingua { max-height: calc(100vh - 240px); overflow-y: auto; }
+.hud.lingua::-webkit-scrollbar { width: 6px; }
+.hud.lingua::-webkit-scrollbar-thumb { background: rgba(110,160,255,.25); border-radius: 3px; }
+.evo-table td { white-space: normal; }
+.evo-best { cursor: help; }

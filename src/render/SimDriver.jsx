@@ -8,7 +8,7 @@ import { useStore } from "../state/store.js";
 export default function SimDriver() {
   useFrame((_, delta) => {
     const { paused, speed, mode } = useStore.getState();
-    if (paused) return;
+    if (paused[mode]) return;
     if (mode === "organism") {
       if (linguaWorld) linguaWorld.step(Math.min(delta, 0.05), speed);
       return;
@@ -23,3 +23,4 @@ export default function SimDriver() {
   });
   return null;
 }
+
