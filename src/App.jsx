@@ -2,12 +2,14 @@ import { useEffect } from "react";
 import Scene from "./render/Scene.jsx";
 import HUD from "./ui/HUD.jsx";
 import LinguaHUD from "./ui/LinguaHUD.jsx";
+import EvolveHUD from "./ui/EvolveHUD.jsx";
 import Controls from "./ui/Controls.jsx";
 import EventFeed from "./ui/EventFeed.jsx";
 import Inspector from "./ui/Inspector.jsx";
 import Help from "./ui/Help.jsx";
 import { useStore } from "./state/store.js";
 import { initLingua } from "./sim/lingua-runtime.js";
+import { initEvolve } from "./sim/evolve-runtime.js";
 
 export default function App() {
   const select = useStore((s) => s.select);
@@ -23,9 +25,10 @@ export default function App() {
     return () => clearInterval(id);
   }, [bumpTick]);
 
-  // load TinyStories the first time organism mode is opened
+  // load TinyStories the first time organism/evolve mode is opened
   useEffect(() => {
     if (mode === "organism") initLingua();
+    if (mode === "evolve") initEvolve();
   }, [mode]);
 
   // keyboard: space pause, R reset, M meteor, Esc deselect
@@ -49,8 +52,10 @@ export default function App() {
           <Inspector />
           <Help />
         </>
-      ) : (
+      ) : mode === "organism" ? (
         <LinguaHUD />
+      ) : (
+        <EvolveHUD />
       )}
       <Controls />
       <EventFeed />

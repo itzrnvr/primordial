@@ -175,3 +175,10 @@ body { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; color: #
   border-radius: 6px; padding: 9px 11px; min-height: 92px; max-height: 150px;
   overflow: hidden; white-space: pre-wrap; word-break: break-word; margin-bottom: 10px;
 }
+/* ---- evolution mode ---- */
+.evo-table { width: 100%; border-collapse: collapse; font-size: 11px; margin: 6px 0; }
+.evo-table th { text-align: left; color: #6b7fa3; font-weight: 500; padding: 2px 4px; font-size: 10px; }
+.evo-table td { padding: 2px 4px; border-top: 1px solid rgba(120,140,180,.12); white-space: nowrap; }
+.evo-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+.evo-best { position: relative; background: rgba(124,255,178,.06); border: 1px solid rgba(124,255,178,.25); border-radius: 8px; padding: 8px 10px; margin: 6px 0; font-size: 11.5px; line-height: 1.55; }
+.evo-explain { font-size: 10.5px; color: #7d8fb0; line-height: 1.5; margin-top: 6px; }

@@ -2,6 +2,7 @@ import { useStore } from "../state/store.js";
 import { world } from "../sim/world.js";
 import { HARD_CAP } from "../sim/constants.js";
 import { initLingua } from "../sim/lingua-runtime.js";
+import { evolveWorld, resetEvolve } from "../sim/evolve-runtime.js";
 
 function Slider({ label, value, min, max, step, onChange, format, help }) {
   return (
@@ -26,6 +27,7 @@ export default function Controls() {
   useStore((s) => s.uiTick);
   const s = useStore();
   const p = world.params;
+  const evo = evolveWorld;
 
   return (
     <div className="controls panel">
@@ -40,6 +42,11 @@ export default function Controls() {
           title="One organism growing from nothing into a language model on TinyStories"
           onClick={() => { s.setMode("organism"); initLingua(); }}
         >organism</button>
+        <button
+          className={s.mode === "evolve" ? "active" : ""}
+          title="A population of language organisms: evolution discovers the architecture, gradient descent does the learning"
+          onClick={() => s.setMode("evolve")}
+        >evolution</button>
       </div>
 
       {s.mode === "ecosystem" ? (
@@ -66,7 +73,7 @@ export default function Controls() {
             <button onClick={s.reset} title="Start over from LUCA, the very first cell">reset</button>
           </div>
         </>
-      ) : (
+      ) : s.mode === "organism" ? (
         <>
           <div className="panel-title">
             organism mode
@@ -81,6 +88,30 @@ export default function Controls() {
           </div>
           <div className="buttons">
             <button onClick={s.togglePause} title="Freeze or resume the organism's learning">{s.paused ? "resume" : "pause"}</button>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="panel-title">
+            evolution mode
+            <span className="panel-hint">hover a slider to learn what it does</span>
+          </div>
+          <Slider label="sim speed" value={s.speed} min={0.25} max={8} step={0.25} onChange={s.setSpeed} format={(v) => v + "x"}
+            help="How much training time per second of real time. Higher = generations pass faster, your browser works harder." />
+          <Slider label="mutation" value={evo ? evo.params.mutationRate : 0.55} min={0} max={1} step={0.05}
+            onChange={(v) => { if (evo) evo.params.mutationRate = v; }}
+            help="Chance that each of the 4 genome numbers (memory K, code size E, brain width H, learn rate) changes when a child is made. 0 = clones, evolution stops. 1 = chaos. Around 0.55 is healthy." />
+          <Slider label="jump rate" value={evo ? evo.params.jumpRate : 0.08} min={0} max={0.5} step={0.01}
+            onChange={(v) => { if (evo) evo.params.jumpRate = v; }}
+            help="Chance that a child gets one gene redrawn completely at random instead of a small tweak. Rare jumps are how evolution escapes local optima - the big leaps no informed search can plan." />
+          <div className="mode-note">
+            Evolution never touches the weights. It searches a genome of just 4 numbers;
+            gradient descent trains each creature during its short life, and the honest score
+            on unseen stories decides who breeds.
+          </div>
+          <div className="buttons">
+            <button onClick={s.togglePause} title="Freeze or resume the evolution">{s.paused ? "resume" : "pause"}</button>
+            <button onClick={() => resetEvolve()} title="Start over from a fresh random population">reset</button>
           </div>
         </>
       )}

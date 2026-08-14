@@ -1,6 +1,7 @@
 import { useFrame } from "@react-three/fiber";
 import { world } from "../sim/world.js";
 import { linguaWorld } from "../sim/lingua-runtime.js";
+import { evolveWorld } from "../sim/evolve-runtime.js";
 import { useStore } from "../state/store.js";
 
 // Steps the active simulation from the render loop.
@@ -10,6 +11,10 @@ export default function SimDriver() {
     if (paused) return;
     if (mode === "organism") {
       if (linguaWorld) linguaWorld.step(Math.min(delta, 0.05), speed);
+      return;
+    }
+    if (mode === "evolve") {
+      if (evolveWorld) evolveWorld.step(Math.min(delta, 0.05), speed);
       return;
     }
     const dt = Math.min(delta, 0.05) * speed;

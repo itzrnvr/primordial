@@ -5,6 +5,7 @@ import SimDriver from "./SimDriver.jsx";
 import Vent from "./Vent.jsx";
 import Organisms from "./Organisms.jsx";
 import GrowingCell from "./GrowingCell.jsx";
+import Population from "./Population.jsx";
 import { useStore } from "../state/store.js";
 
 export default function Scene({ onSelect }) {
@@ -20,7 +21,13 @@ export default function Scene({ onSelect }) {
       <ambientLight intensity={0.32} />
       <SimDriver />
       <Vent />
-      {mode === "ecosystem" ? <Organisms onSelect={onSelect} /> : <GrowingCell />}
+      {mode === "ecosystem" ? (
+        <Organisms onSelect={onSelect} />
+      ) : mode === "organism" ? (
+        <GrowingCell />
+      ) : (
+        <Population />
+      )}
       <Stars radius={230} depth={60} count={2600} factor={5} saturation={0.35} fade speed={0.5} />
       <OrbitControls
         autoRotate
