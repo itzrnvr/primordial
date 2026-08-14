@@ -68,7 +68,7 @@ export default function EvolveHUD() {
 
       {be && (
         <div className="evo-best" title="The honest score is the average surprise per character on stories it NEVER trained on. Random guessing = 4.25. Lower = smarter.">
-          <b className="c-green">best ever</b> gen {be.gen} #{be.id}: <b>{be.valLoss.toFixed(3)}</b> · {fmtParams(be.params)} params
+          <b className="c-green">best ever</b> gen {be.championGen ?? st.gen} #{be.id}: <b>{be.valLoss.toFixed(3)}</b> · {fmtParams(be.org.paramCount())} params
           <br />
           genome K={be.genome.K} E={be.genome.E} H={be.genome.H} lr={be.genome.lr.toFixed(3)}
         </div>
@@ -112,3 +112,4 @@ export default function EvolveHUD() {
     </div>
   );
 }
+

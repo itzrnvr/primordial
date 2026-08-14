@@ -43,6 +43,8 @@ Mutation is informed (recombination of proven archive genomes + small
 nudges) but keeps rare full-random jumps: jumps are how search escapes local
 optima. Evolution never touches the weights.
 
+Progress autosaves to the browser's localStorage every few seconds and on refresh: the champion's weights, its score, the generation history and your active mode all survive a page reload. The reset buttons clear the save and start truly fresh. (The ecosystem mode still starts fresh by design - it regrows in seconds.)
+
 Headless verification (5 creatures, 220-step lifetimes, 6 generations):
 generation 1 best 2.864 -> generation 3 best 2.609, winning genome
 K32/E16/H96/lr0.19 — evolution discovered that long memory matters before
@@ -133,3 +135,4 @@ public/data/      TinyStories train/valid slices (~6 MB / ~1.5 MB)
 - Honest scoring only: unseen stories, never training loss.
 - Anything predefined is listed in one place, and the roadmap exists to
   shrink that list.
+

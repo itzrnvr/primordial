@@ -6,6 +6,7 @@
 // ============================================================
 
 import { LinguaOrganism, linguaReseed, rng } from "./lingua.js";
+import { f32ToB64, b64ToF32 } from "./persist.js";
 
 // Build a character vocabulary from the most frequent chars.
 // Anything rarer maps to id 0 ("unknown").
@@ -183,6 +184,45 @@ export class LinguaWorld {
     const budget = Math.min(10 * speed, 60);
     const t0 = performance.now();
     while (performance.now() - t0 < budget) this.trainOneStep();
+  }
+
+  // ---- persistence across refreshes ----
+  toSave() {
+    const o = this.org;
+    return {
+      v: 1,
+      E: this.E, K: o.K, H: o.H, lr: o.lr, growths: o.growths,
+      steps: this.steps, trainEMA: this.trainEMA, validEMA: this.validEMA,
+      validAtLastGrowth: this.validAtLastGrowth, stepsSinceGrowth: this.stepsSinceGrowth,
+      capped: this.capped, history: this.history, sample: this.sample,
+      w: { emb: f32ToB64(o.emb), W1: f32ToB64(o.W1), b1: f32ToB64(o.b1), W2: f32ToB64(o.W2), b2: f32ToB64(o.b2) },
+    };
+  }
+
+  applySave(d) {
+    if (!d || d.v !== 1 || !d.w) return false;
+    const o = new LinguaOrganism(this.vocab.V, d.E ?? this.E, d.K ?? 2, d.H ?? 16, d.lr ?? 0.06);
+    const emb = b64ToF32(d.w.emb, o.emb.length);
+    const W1 = b64ToF32(d.w.W1, o.W1.length);
+    const b1 = b64ToF32(d.w.b1, o.b1.length);
+    const W2 = b64ToF32(d.w.W2, o.W2.length);
+    const b2 = b64ToF32(d.w.b2, o.b2.length);
+    if (!emb || !W1 || !b1 || !W2 || !b2) return false;
+    o.emb.set(emb); o.W1.set(W1); o.b1.set(b1); o.W2.set(W2); o.b2.set(b2);
+    o.growths = d.growths ?? 0;
+    this.org = o;
+    this.E = d.E ?? this.E;
+    this.steps = d.steps ?? 0;
+    this.trainEMA = d.trainEMA ?? this.trainEMA;
+    this.validEMA = d.validEMA ?? this.validEMA;
+    this.validAtLastGrowth = d.validAtLastGrowth ?? this.validEMA;
+    this.stepsSinceGrowth = d.stepsSinceGrowth ?? 0;
+    this.capped = !!d.capped;
+    if (d.history && Array.isArray(d.history.steps)) this.history = d.history;
+    this.sample = d.sample ?? "";
+    this.log("RESTORED", "organism woke up at step " + this.steps +
+      " with honest score " + this.validEMA.toFixed(3) + " - progress kept", "#7cffb2");
+    return true;
   }
 
   stats() {

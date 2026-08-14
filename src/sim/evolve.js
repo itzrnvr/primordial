@@ -23,6 +23,7 @@
 
 import { LinguaOrganism, linguaReseed, rng } from "./lingua.js";
 import { buildVocab, encodeText } from "./lingua-world.js";
+import { f32ToB64, b64ToF32 } from "./persist.js";
 
 export const KGRID = [2, 4, 8, 16, 24, 32];
 export const EGRID = [8, 12, 16, 24];
@@ -298,6 +299,82 @@ export class EvolutionWorld {
     champ.done = false;
     this.gen++;
     this.cursor = 0;
+  }
+
+  // ---- persistence: keep the champion and history across refreshes ----
+  toSave() {
+    const c = this.champion;
+    return {
+      v: 1,
+      gen: this.gen,
+      nextId: this.nextId,
+      params: { ...this.params },
+      history: this.history.slice(-200),
+      archive: this.archive,
+      champion: c ? {
+        id: c.id, lineage: c.lineage, genome: c.genome,
+        valLoss: c.valLoss, trainEMA: c.trainEMA,
+        championGen: c.championGen ?? this.gen,
+        w: {
+          emb: f32ToB64(c.org.emb), W1: f32ToB64(c.org.W1), b1: f32ToB64(c.org.b1),
+          W2: f32ToB64(c.org.W2), b2: f32ToB64(c.org.b2),
+        },
+      } : null,
+    };
+  }
+
+  applySave(d) {
+    if (!d || d.v !== 1 || !d.champion) return false;
+    const g = d.champion.genome;
+    const ind = this.spawn(g, 0, d.champion.lineage);
+    const o = ind.org;
+    const w = d.champion.w || {};
+    const emb = b64ToF32(w.emb, o.emb.length);
+    const W1 = b64ToF32(w.W1, o.W1.length);
+    const b1 = b64ToF32(w.b1, o.b1.length);
+    const W2 = b64ToF32(w.W2, o.W2.length);
+    const b2 = b64ToF32(w.b2, o.b2.length);
+    if (!emb || !W1 || !b1 || !W2 || !b2) return false;
+    o.emb.set(emb); o.W1.set(W1); o.b1.set(b1); o.W2.set(W2); o.b2.set(b2);
+
+    ind.id = d.champion.id;
+    ind.valLoss = d.champion.valLoss;
+    ind.trainEMA = d.champion.trainEMA ?? this.lnV;
+    ind.championGen = d.champion.championGen ?? d.gen;
+    ind.isChampion = true;
+    ind.champion = true;
+    ind.snapshot = snapshotOrganism(o);
+    ind.step = 0;
+    ind.done = false;
+
+    this.nextId = Math.max(d.nextId ?? 1, ind.id + 1);
+    this.gen = d.gen ?? 1;
+    if (d.params) this.params = { ...this.params, ...d.params };
+    this.history = Array.isArray(d.history) ? d.history : [];
+    this.archive = Array.isArray(d.archive) ? d.archive : [];
+
+    this.champion = ind;
+    this.bestEver = ind;
+
+    // The rest of the population is regrown as children of proven
+    // genomes. The champion's weights and score are the kept progress.
+    const pop = [ind];
+    const archGenomes = this.archive.map((a) => a.genome);
+    while (pop.length < this.popSize) {
+      const parentGenome = archGenomes.length
+        ? archGenomes[Math.floor(rng() * archGenomes.length)]
+        : g;
+      pop.push(this.spawn(
+        breedGenome(parentGenome, archGenomes, this.params.mutationRate, this.params.jumpRate),
+        ind.id, ind.lineage
+      ));
+    }
+    this.population = pop;
+    this.cursor = 0;
+    this.sample = ind.org.generate("One day, ", 300, this.vocab.stoi, this.vocab.itos, 0.85);
+    this.log("RESTORED", "champion #" + ind.id + " woke up at gen " + this.gen +
+      " with score " + ind.valLoss.toFixed(3) + " - progress kept", "#7cffb2");
+    return true;
   }
 
   stats() {
