@@ -3,7 +3,7 @@
 // language model.
 //
 // Its life:
-//   1. Born tiny: it sees 2 characters and has 16 brain units.
+//   1. Born tiny: it sees 2 characters and 16 brain units.
 //   2. It feeds on TinyStories by predicting the next character.
 //      Predicting well = learning. Predicting badly = high loss.
 //   3. When it stops improving (a plateau), it GROWS: a longer
@@ -13,14 +13,12 @@
 //   4. Repeat until it hits the size ceiling. Then it keeps
 //      learning at full size.
 //
-// SENSES (optional, evolved):
-//   The genome may switch on extra input "senses" - deterministic
-//   features of the raw text that make structure visible:
-//     b - boundary sense: 1 where the character is a space
-//     p - position sense: how far into the current word we are
-//   These are computed from the raw characters at train AND eval
-//   time, so they cannot cheat - they only help if seeing word
-//   structure genuinely makes the language easier to learn.
+// EVOLVED TRAITS (all cheat-proof, all computed from raw text at
+// train AND eval time):
+//   senses:  b - boundary sense: 1 where the character is a space
+//            p - position sense: how far into the current word
+//            w - word sense: 1 when a known frequent word is in view
+//   learning rule: mo - momentum, lm - output-layer lr multiplier
 //
 // All math is manual (typed arrays + loops) so you can read
 // every line. No framework.
@@ -38,35 +36,46 @@ function gauss() {
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rng());
 }
 
+// Cheap stable hash of a slice of char ids (for the word sense).
+export function hashIds(ids, from, to) {
+  let h = 2166136261 >>> 0;
+  for (let i = from; i < to; i++) {
+    h ^= (ids[i] + 1) >>> 0;
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h >>> 0;
+}
+
 // ------------------------------------------------------------
 // The organism: a character-level language model.
-//   input : the last K characters, each embedded into E numbers,
-//           plus (optionally) F sense features per position
-//   brain : one hidden layer of H units (tanh)
-//   output: probabilities over the next character
 // ------------------------------------------------------------
 export class LinguaOrganism {
   constructor(V, E, K, H, lr, opts = {}) {
-    this.V = V;           // vocabulary size
-    this.E = E;           // embedding dimension per character
-    this.K = K;           // context window (how many past chars it sees)
-    this.H = H;           // brain width (hidden units)
-    this.lr = lr;         // learning rate
+    this.V = V;
+    this.E = E;
+    this.K = K;
+    this.H = H;
+    this.lr = lr;
     this.growths = 0;
 
     // senses: deterministic input features, evolved, cheat-proof
     this.spaceId = opts.spaceId ?? -1;
-    this.fb = !!opts.fb;  // boundary sense (sees spaces)
-    this.fp = !!opts.fp;  // position-in-word sense
-    this.F = (this.fb ? 1 : 0) + (this.fp ? 1 : 0);
+    this.fb = !!opts.fb;
+    this.fp = !!opts.fp;
+    this.fw = !!opts.fw && !!opts.freqSet;
+    this.freqSet = opts.freqSet || null;
+    this.F = (this.fb ? 1 : 0) + (this.fp ? 1 : 0) + (this.fw ? 1 : 0);
+
+    // learning rule genes
+    this.mom = opts.mom ?? 0;      // momentum (0 = plain SGD)
+    this.lm = opts.lm ?? 1;        // output-layer lr multiplier
 
     const F = this.F;
-    // weights
-    this.emb = new Float32Array(V * E);                 // char -> E numbers
-    this.W1 = new Float32Array(K * E * H);              // input -> brain
-    this.Wf = new Float32Array(K * F * H);              // senses -> brain
+    this.emb = new Float32Array(V * E);
+    this.W1 = new Float32Array(K * E * H);
+    this.Wf = new Float32Array(K * F * H);
     this.b1 = new Float32Array(H);
-    this.W2 = new Float32Array(H * V);                  // brain -> output
+    this.W2 = new Float32Array(H * V);
     this.b2 = new Float32Array(V);
 
     const s = 0.35;
@@ -74,6 +83,15 @@ export class LinguaOrganism {
     for (let i = 0; i < this.W1.length; i++) this.W1[i] = gauss() * s / Math.sqrt(K * E);
     for (let i = 0; i < this.Wf.length; i++) this.Wf[i] = gauss() * 0.05;
     for (let i = 0; i < this.W2.length; i++) this.W2[i] = gauss() * s / Math.sqrt(H);
+
+    if (this.mom > 0) {
+      this.vEmb = new Float32Array(V * E);
+      this.vW1 = new Float32Array(K * E * H);
+      this.vWf = new Float32Array(K * F * H);
+      this.vB1 = new Float32Array(H);
+      this.vW2 = new Float32Array(H * V);
+      this.vB2 = new Float32Array(V);
+    }
   }
 
   paramCount() {
@@ -81,28 +99,34 @@ export class LinguaOrganism {
   }
 
   // Sense features for one context row, derived from raw ids.
-  // Layout: K rows x F features.
   feats(row, out, off) {
-    const { K, fb, fp, spaceId } = this;
+    const { K, fb, fp, fw, spaceId, freqSet } = this;
+    const F = this.F;
     let since = 8;
     for (let k = 0; k < K; k++) {
       const id = row[k];
       let f = 0;
-      if (fb) out[off + k * this.F + f++] = id === spaceId ? 1 : 0;
-      if (fp) out[off + k * this.F + f++] = Math.min(since, 8) / 8;
+      if (fb) out[off + k * F + f++] = id === spaceId ? 1 : 0;
+      if (fp) out[off + k * F + f++] = Math.min(since, 8) / 8;
+      if (fw) {
+        // the full word containing position k (it is already over)
+        let s0 = k;
+        while (s0 > 0 && row[s0 - 1] !== spaceId && k - s0 < 12) s0--;
+        let e0 = k;
+        while (e0 < K - 1 && row[e0 + 1] !== spaceId && e0 - s0 < 12) e0++;
+        out[off + k * F + f++] = freqSet.has(hashIds(row, s0, e0 + 1)) ? 1 : 0;
+      }
       since = id === spaceId ? 0 : since + 1;
     }
   }
 
-  // One training step over a batch.
-  // ctx: Int32Array [B * stride] of char ids, tgt: Int32Array [B] next-char ids.
-  // Returns the cross-entropy loss. This is the whole organism eating.
   trainBatch(ctx, tgt, B, stride = this.K) {
-    const { V, E, K, H, F, emb, W1, Wf, b1, W2, b2, lr } = this;
+    const { V, E, K, H, F, emb, W1, Wf, b1, W2, b2, lr, mom, lm } = this;
     const D = K * E;
+    const lr2 = lr * lm;
 
     // ---- forward ----
-    const X = new Float32Array(B * D);          // embedded context
+    const X = new Float32Array(B * D);
     for (let b = 0; b < B; b++) {
       for (let k = 0; k < K; k++) {
         const id = ctx[b * stride + k];
@@ -111,10 +135,10 @@ export class LinguaOrganism {
         for (let e = 0; e < E; e++) X[dst + e] = emb[src + e];
       }
     }
-    const FX = F ? new Float32Array(B * K * F) : null;   // sense features
+    const FX = F ? new Float32Array(B * K * F) : null;
     if (F) for (let b = 0; b < B; b++) this.feats(ctx.subarray(b * stride, b * stride + K), FX, b * K * F);
 
-    const H1 = new Float32Array(B * H);         // hidden activations
+    const H1 = new Float32Array(B * H);
     for (let b = 0; b < B; b++) {
       for (let j = 0; j < H; j++) {
         let z = b1[j];
@@ -127,7 +151,6 @@ export class LinguaOrganism {
         H1[b * H + j] = Math.tanh(z);
       }
     }
-    // logits + softmax + loss
     let loss = 0;
     const dLogits = new Float32Array(B * V);
     for (let b = 0; b < B; b++) {
@@ -167,7 +190,7 @@ export class LinguaOrganism {
     for (let b = 0; b < B; b++) {
       for (let j = 0; j < H; j++) {
         const h = H1[b * H + j];
-        let g = dH1[b * H + j] * (1 - h * h);   // tanh derivative
+        let g = dH1[b * H + j] * (1 - h * h);
         db1[j] += g;
         for (let i = 0; i < D; i++) {
           dW1[i * H + j] += X[b * D + i] * g;
@@ -180,22 +203,39 @@ export class LinguaOrganism {
       }
     }
 
-    // ---- SGD update ----
-    for (let i = 0; i < W2.length; i++) W2[i] -= lr * dW2[i];
-    for (let i = 0; i < b2.length; i++) b2[i] -= lr * db2[i];
-    for (let i = 0; i < W1.length; i++) W1[i] -= lr * dW1[i];
-    if (F) for (let i = 0; i < Wf.length; i++) Wf[i] -= lr * dWf[i];
-    for (let i = 0; i < b1.length; i++) b1[i] -= lr * db1[i];
-    for (let b = 0; b < B; b++) {
-      for (let k = 0; k < K; k++) {
-        const id = ctx[b * stride + k];
-        for (let e = 0; e < E; e++) emb[id * E + e] -= lr * dX[b * D + k * E + e];
+    // ---- update (SGD, optionally with momentum) ----
+    const step = (w, g, v, l) => {
+      if (v) { for (let i = 0; i < w.length; i++) { v[i] = mom * v[i] - l * g[i]; w[i] += v[i]; } }
+      else { for (let i = 0; i < w.length; i++) w[i] -= l * g[i]; }
+    };
+    step(W2, dW2, this.vW2, lr2);
+    step(b2, db2, this.vB2, lr2);
+    step(W1, dW1, this.vW1, lr);
+    if (F) step(Wf, dWf, this.vWf, lr);
+    step(b1, db1, this.vB1, lr);
+    if (this.vEmb) {
+      const vE = this.vEmb;
+      for (let b = 0; b < B; b++) {
+        for (let k = 0; k < K; k++) {
+          const id = ctx[b * stride + k];
+          for (let e = 0; e < E; e++) {
+            const idx = id * E + e;
+            vE[idx] = mom * vE[idx] - lr * dX[b * D + k * E + e];
+            emb[idx] += vE[idx];
+          }
+        }
+      }
+    } else {
+      for (let b = 0; b < B; b++) {
+        for (let k = 0; k < K; k++) {
+          const id = ctx[b * stride + k];
+          for (let e = 0; e < E; e++) emb[id * E + e] -= lr * dX[b * D + k * E + e];
+        }
       }
     }
     return loss / B;
   }
 
-  // Forward only, for one context row. Returns softmax probabilities.
   predict(row) {
     const { V, E, K, H, F, emb, W1, Wf, b1, W2, b2 } = this;
     const D = K * E;
@@ -227,25 +267,18 @@ export class LinguaOrganism {
     return zs;
   }
 
-  // ------------------------------------------------------------
-  // GROWTH. The organism gets bigger WITHOUT forgetting: old
-  // weights are copied over untouched, and the new parts start
-  // nearly silent, so behaviour is preserved at the moment of
-  // growth. Learning then wakes the new capacity up.
-  // ------------------------------------------------------------
   growContext(newK) {
     const { E, H, K, F } = this;
     const oldD = K * E;
     const newD = newK * E;
     const addD = newD - oldD;
     const W1n = new Float32Array(newD * H);
-    // new (older) context slots come first and start quiet
     for (let i = 0; i < addD; i++)
       for (let j = 0; j < H; j++) W1n[i * H + j] = gauss() * 0.01;
-    // old context keeps its exact knowledge
     for (let i = 0; i < oldD; i++)
       for (let j = 0; j < H; j++) W1n[(i + addD) * H + j] = this.W1[i * H + j];
     this.W1 = W1n;
+    if (this.vW1) { this.vW1 = new Float32Array(newD * H); }
     if (F) {
       const oldS = K * F, newS = newK * F, addS = newS - oldS;
       const Wfn = new Float32Array(newS * H);
@@ -254,6 +287,7 @@ export class LinguaOrganism {
       for (let i = 0; i < oldS; i++)
         for (let j = 0; j < H; j++) Wfn[(i + addS) * H + j] = this.Wf[i * H + j];
       this.Wf = Wfn;
+      if (this.vWf) { this.vWf = new Float32Array(newS * H); }
     }
     this.K = newK;
     this.growths++;
@@ -287,12 +321,13 @@ export class LinguaOrganism {
     }
     this.W1 = W1n; this.b1 = b1n; this.W2 = W2n;
     if (Wfn) this.Wf = Wfn;
+    if (this.vW1) { this.vW1 = new Float32Array(D * newH); this.vB1 = new Float32Array(newH); }
+    if (this.vW2) { this.vW2 = new Float32Array(newH * V); this.vB2 = new Float32Array(V); }
+    if (this.vWf && Wfn) { this.vWf = new Float32Array(K * F * newH); }
     this.H = newH;
     this.growths++;
   }
 
-  // Produce text: sample one character at a time from its own
-  // predictions. This is how you hear what it has learned.
   generate(seedText, nChars, stoi, itos, temperature = 0.8) {
     const K = this.K;
     const ids = [];
@@ -307,7 +342,6 @@ export class LinguaOrganism {
         row[k] = idx2 >= 0 ? ids[idx2] : 0;
       }
       const probs = this.predict(row);
-      // temperature sampling: lower temperature = more confident
       let sum = 0;
       const adj = new Float32Array(this.V);
       for (let v = 0; v < this.V; v++) {
@@ -326,5 +360,3 @@ export class LinguaOrganism {
     return out;
   }
 }
-
-

@@ -104,6 +104,12 @@ export default function Controls() {
           <Slider label="jump rate" value={evo ? evo.params.jumpRate : 0.08} min={0} max={0.5} step={0.01}
             onChange={(v) => { if (evo) evo.params.jumpRate = v; }}
             help="Chance that a child gets one gene redrawn completely at random instead of a small tweak. Rare jumps are how evolution escapes local optima - the big leaps no informed search can plan." />
+          <Slider label="life compute" value={evo ? Math.round(evo.params.flopBudget / 1e6) : 16} min={2} max={64} step={2}
+            onChange={(v) => { if (evo) evo.params.flopBudget = v * 1e6; }} format={(v) => v + "M"}
+            help="The compute ceiling per life: steps = budget / params. Small microbes get many steps, big brains few - the same total work, like a real energy budget. New lives get the new budget." />
+          <Slider label="efficiency" value={evo ? evo.params.effPressure : 0} min={0} max={1} step={0.05}
+            onChange={(v) => { if (evo) evo.params.effPressure = v; }}
+            help="Pressure toward smaller brains when choosing parents. 0 = only score matters. 1 = size matters a lot, tiny microbes win ties. The champion score always stays pure quality." />
           <div className="mode-note">
             Evolution never touches the weights. It searches a genome of just 4 numbers;
             gradient descent trains each creature during its short life, and the honest score
@@ -118,4 +124,5 @@ export default function Controls() {
     </div>
   );
 }
+
 

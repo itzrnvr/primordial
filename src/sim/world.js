@@ -5,7 +5,7 @@
 // ============================================================
 
 import { GENE, GENE_COUNT, DEFAULTS, SOFT_CAP, HARD_CAP } from "./constants.js";
-import { Organism } from "./organism.js";
+import { Organism, peekNextId, bumpIdTo } from "./organism.js";
 import { seedGenome, reseed, gauss, rng } from "./genome.js";
 
 export class World {
@@ -379,6 +379,86 @@ export class World {
       recordChildren: Math.max(this.recordChildren, topParent ? topParent.children : 0),
     };
   }
+
+
+  // ---- persistence: the ecology survives refreshes ----
+  toSave() {
+    return {
+      v: 1,
+      time: this.time,
+      totalBirths: this.totalBirths,
+      totalDeaths: this.totalDeaths,
+      maxGeneration: this.maxGeneration,
+      nextLineageId: this.nextLineageId,
+      lineages: [...this.lineages.entries()],
+      params: { ...this.params },
+      optimum: this.env.optimum,
+      signalPhase: this.signalPhase,
+      signalValue: this.signalValue,
+      recordAge: this.recordAge,
+      recordChildren: this.recordChildren,
+      milestones: [...this.milestones],
+      history: this.history,
+      nextId: peekNextId(),
+      organisms: this.organisms.slice(0, 250).map((o) => ({
+        g: o.genome, gen: o.generation, lin: o.lineage, e: o.energy, age: o.age,
+        ch: o.children, k: o.kills, lr: o.lastRepro, lk: o.lastKill, cr: o.credited,
+        p: [o.pos.x, o.pos.y, o.pos.z], v: [o.vel.x, o.vel.y, o.vel.z],
+        ps: o.prevSignal, p2: o.prev2Signal,
+        b: { w1: o.brain.w1, b1: o.brain.b1, w2: o.brain.w2, b2: o.brain.b2, skill: o.brain.skill },
+      })),
+    };
+  }
+
+  applySave(d) {
+    if (!d || d.v !== 1 || !Array.isArray(d.organisms)) return false;
+    this.reset();
+    this.time = d.time ?? 0;
+    this.totalBirths = d.totalBirths ?? 0;
+    this.totalDeaths = d.totalDeaths ?? 0;
+    this.maxGeneration = d.maxGeneration ?? 0;
+    this.nextLineageId = d.nextLineageId ?? 1;
+    this.lineages = new Map(d.lineages || []);
+    if (d.params) this.params = { ...this.params, ...d.params };
+    this.env.optimum = d.optimum ?? 0.5;
+    this.signalPhase = d.signalPhase ?? 0;
+    this.signalValue = d.signalValue ?? 0.5;
+    this.recordAge = d.recordAge ?? 0;
+    this.recordChildren = d.recordChildren ?? 0;
+    this.milestones = new Set(d.milestones || []);
+    if (d.history && Array.isArray(d.history.t)) this.history = d.history;
+    bumpIdTo(d.nextId ?? 1);
+    this.organisms = d.organisms.map((r) => {
+      const o = new Organism(r.g, r.gen, r.lin, { x: r.p[0], y: r.p[1], z: r.p[2] });
+      o.energy = r.e; o.age = r.age; o.children = r.ch ?? 0; o.kills = r.k ?? 0;
+      o.lastRepro = r.lr ?? -10; o.lastKill = r.lk ?? -10; o.credited = !!r.cr;
+      o.vel = { x: r.v[0], y: r.v[1], z: r.v[2] };
+      o.prevSignal = r.ps ?? 0.5; o.prev2Signal = r.p2 ?? 0.5;
+      if (r.b && r.b.w1 && r.b.w1.length === o.brain.w1.length) {
+        o.brain.w1 = r.b.w1; o.brain.b1 = r.b.b1; o.brain.w2 = r.b.w2;
+        o.brain.b2 = r.b.b2; o.brain.skill = r.b.skill ?? 0.4;
+      }
+      return o;
+    });
+    this.log("RESTORED", "the ecology woke up with " + this.organisms.length + " cells at t=" + Math.round(this.time), "#7cffb2");
+    return true;
+  }
 }
 
 export const world = new World();
+
+const ECO_KEY = "primordial.eco.v1";
+export function saveEco() {
+  try { localStorage.setItem(ECO_KEY, JSON.stringify(world.toSave())); } catch { /* ignore */ }
+}
+export function loadEco() {
+  try {
+    const raw = localStorage.getItem(ECO_KEY);
+    if (raw) return world.applySave(JSON.parse(raw));
+  } catch { /* ignore */ }
+  return false;
+}
+export function clearEco() {
+  try { localStorage.removeItem(ECO_KEY); } catch { /* ignore */ }
+}
+

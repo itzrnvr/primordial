@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { world } from "../sim/world.js";
+import { world, clearEco } from "../sim/world.js";
 
 // UI state. The sims themselves live in plain mutable JS
 // (world / linguaWorld / evolveWorld). React re-renders on a slow
@@ -59,8 +59,10 @@ export const useStore = create((set, get) => ({
     set({});
   },
   reset: () => {
+    clearEco();
     world.reset();
     set({ selectedId: null });
   },
   meteor: () => world.meteor(0.45),
 }));
+

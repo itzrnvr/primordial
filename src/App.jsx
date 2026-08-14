@@ -10,6 +10,7 @@ import Help from "./ui/Help.jsx";
 import { useStore } from "./state/store.js";
 import { initLingua } from "./sim/lingua-runtime.js";
 import { initEvolve } from "./sim/evolve-runtime.js";
+import { loadEco, saveEco } from "./sim/world.js";
 
 export default function App() {
   const select = useStore((s) => s.select);
@@ -30,6 +31,20 @@ export default function App() {
     if (mode === "organism") initLingua();
     if (mode === "evolve") initEvolve();
   }, [mode]);
+
+  // the ecology survives refreshes: load once, autosave forever
+  useEffect(() => {
+    loadEco();
+    const id = setInterval(saveEco, 5000);
+    const onHide = () => { if (document.visibilityState === "hidden") saveEco(); };
+    window.addEventListener("beforeunload", saveEco);
+    document.addEventListener("visibilitychange", onHide);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener("beforeunload", saveEco);
+      document.removeEventListener("visibilitychange", onHide);
+    };
+  }, []);
 
   // keyboard: space pause, R reset, M meteor, Esc deselect
   useEffect(() => {
@@ -65,3 +80,4 @@ export default function App() {
     </div>
   );
 }
+

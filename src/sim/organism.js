@@ -147,3 +147,7 @@ export class Organism {
     return child;
   }
 }
+
+// id-counter access for persistence
+export function peekNextId() { return nextId; }
+export function bumpIdTo(n) { if (n > nextId) nextId = n; }
