@@ -9,7 +9,7 @@ function lineageColor(id) {
   return "hsl(" + (((id || 1) * 137.508) % 360) + ",75%,60%)";
 }
 
-// best (green) and mean (grey) honest score per generation
+// champion (green, never worsens) and population mean (grey)
 function GenChart({ history }) {
   const ref = useRef();
   useEffect(() => {
@@ -63,7 +63,7 @@ export default function EvolveHUD() {
       <div className="title">EVOLUTION<span className="sub">evolution discovers the architecture - gradient descent does the learning</span></div>
 
       <div className="status-line">
-        gen <b>{st.gen}</b> · scored <b>{st.done}/{st.total}</b> · life <b>{st.stepsPerGen}</b> steps · archive <b>{st.archiveSize}</b>
+        gen <b>{st.gen}</b> · scored <b>{st.done}/{st.total}</b> · champion score <b>{st.bestEver ? st.bestEver.valLoss.toFixed(3) : "pending"}</b> · archive <b>{st.archiveSize}</b>
       </div>
 
       {be && (
@@ -81,7 +81,10 @@ export default function EvolveHUD() {
         <tbody>
           {st.board.map((p) => (
             <tr key={p.id} title={"creature #" + p.id + " - learn rate " + p.genome.lr.toFixed(3) + (p.done ? " - honest score " + p.valLoss.toFixed(3) : " - still training")}>
-              <td><span className="evo-dot" style={{ background: lineageColor(p.lineage) }} />#{p.id}</td>
+              <td>
+                <span className="evo-dot" style={{ background: lineageColor(p.lineage) }} />
+                {p.champion ? <b className="c-green">champ</b> : "#" + p.id}
+              </td>
               <td>{p.done ? p.valLoss.toFixed(3) : p.step + "/" + st.stepsPerGen}</td>
               <td>{fmtParams(p.org.paramCount())}</td>
               <td>K{p.genome.K} E{p.genome.E} H{p.genome.H}</td>
@@ -98,7 +101,8 @@ export default function EvolveHUD() {
       <div className="evo-explain">
         Genome = 4 numbers only: K memory, E code size, H brain width, lr learn rate.
         Evolution mutates those; gradient descent trains the weights inside each life.
-        Lowest honest scores breed the next generation.
+        The reigning champion survives with its trained weights. A child must beat it on
+        the same fixed unseen set to replace it, so the green champion line cannot regress.
         In 3D: color = family, height = skill, size = params. Hover a row for details.
       </div>
 

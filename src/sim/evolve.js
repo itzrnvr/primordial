@@ -72,6 +72,24 @@ export function breedGenome(parent, archiveGenomes, mutRate, jumpRate) {
   return mutateGenome(c, mutRate, jumpRate);
 }
 
+function snapshotOrganism(o) {
+  return {
+    emb: o.emb.slice(),
+    W1: o.W1.slice(),
+    b1: o.b1.slice(),
+    W2: o.W2.slice(),
+    b2: o.b2.slice(),
+  };
+}
+
+function restoreOrganism(o, snap) {
+  o.emb.set(snap.emb);
+  o.W1.set(snap.W1);
+  o.b1.set(snap.b1);
+  o.W2.set(snap.W2);
+  o.b2.set(snap.b2);
+}
+
 export class EvolutionWorld {
   constructor(trainText, validText, opts = {}) {
     linguaReseed(opts.seed ?? 777);
@@ -84,18 +102,26 @@ export class EvolutionWorld {
     this.eliteCount = Math.min(2, this.popSize - 1);
     this.params = { mutationRate: 0.55, jumpRate: 0.08 };
 
-    // fixed honest pool: positions in the UNSEEN stories
+    // Fixed honest pool and a fixed evaluation subset. The subset is
+    // deterministic, so the same trained organism always receives the
+    // same score. This removes evaluation noise from selection.
     this.poolSize = 700;
     this.validPos = new Int32Array(this.poolSize);
     for (let i = 0; i < this.poolSize; i++)
       this.validPos[i] = KMAX + Math.floor(rng() * (this.validIds.length - KMAX - 2));
 
     this.batchSize = 48;
+    this.evalSize = Math.min(128, this.poolSize);
     this.gen = 1;
     this.nextId = 1;
     this.archive = [];     // proven genomes, best-first
     this.history = [];     // { gen, best, mean, params }
     this.events = [];
+    // The reigning champion keeps its actual trained weights and enters
+    // every following generation. A child must beat its score to replace
+    // it. Therefore the champion score can improve or stay equal, but it
+    // cannot get worse.
+    this.champion = null;
     this.bestEver = null;
     this.sample = "";
     this.lnV = Math.log(this.vocab.V);
@@ -139,17 +165,35 @@ export class EvolutionWorld {
     ind.trainEMA = ind.trainEMA * 0.97 + loss * 0.03;
     ind.step++;
     if (ind.step >= this.stepsPerGen) {
-      ind.valLoss = this.evaluate(o);
+      const newScore = this.evaluate(o);
+      if (ind.isChampion) {
+        // The champion gets another lifetime of learning. If that extra
+        // training helps on the fixed unseen set, keep it. If it hurts,
+        // roll back to the snapshot. Its score therefore cannot regress.
+        if (newScore < ind.valLoss) {
+          ind.valLoss = newScore;
+          ind.lifeImproved = true;
+          this.log("CHAMPION", "champion #" + ind.id + " improved itself to " + newScore.toFixed(3), "#7cffb2");
+        } else {
+          restoreOrganism(o, ind.snapshot);
+          ind.lifeImproved = false;
+        }
+        ind.snapshot = null;
+      } else {
+        ind.valLoss = newScore;
+      }
       ind.done = true;
     }
   }
 
-  // Honest score: mean surprise on stories it never trained on.
+  // Honest score: mean surprise on a fixed set of stories it never
+  // trained on. No random sampling here: identical weights always get
+  // an identical score.
   evaluate(o) {
-    const K = o.K, S = 96;
+    const K = o.K, S = this.evalSize;
     let sum = 0;
     for (let i = 0; i < S; i++) {
-      const pos = this.validPos[Math.floor(rng() * this.poolSize)];
+      const pos = this.validPos[i];
       const row = new Int32Array(K);
       for (let k = 0; k < K; k++) row[k] = this.validIds[pos - K + k];
       const probs = o.predict(row);
@@ -177,33 +221,62 @@ export class EvolutionWorld {
     const sorted = [...this.population].sort((a, b) => a.valLoss - b.valLoss);
     const best = sorted[0];
     const mean = sorted.reduce((s, x) => s + x.valLoss, 0) / sorted.length;
-    this.history.push({ gen: this.gen, best: best.valLoss, mean, params: best.org.paramCount() });
+
+    const previousChampion = this.champion;
+    const winner = !previousChampion || best.valLoss < previousChampion.valLoss ? best : previousChampion;
+    // A new child wins only if it is strictly better. A retained
+    // incumbent may still improve through its continued-learning trial.
+    const championImproved =
+      !!previousChampion &&
+      winner.valLoss < previousChampion.valLoss;
+    this.champion = winner;
+    this.champion.champion = true;
+    this.champion.isChampion = true;
+
+    // If the incumbent wins, recompute its stored generation fields so the
+    // UI reports the generation it was retained through, not only born in.
+    this.champion.retainedGen = this.gen;
+    this.bestEver = winner;
+
+    this.history.push({
+      gen: this.gen,
+      best: winner.valLoss,   // monotonic by construction
+      mean,
+      params: winner.org.paramCount(),
+    });
 
     this.archive.push({
-      genome: { ...best.genome }, valLoss: best.valLoss,
-      params: best.org.paramCount(), gen: this.gen, lineage: best.lineage,
+      genome: { ...winner.genome }, valLoss: winner.valLoss,
+      params: winner.org.paramCount(), gen: this.gen, lineage: winner.lineage,
+      id: winner.id,
     });
+    this.archive = this.archive.filter((a, i, arr) => arr.findIndex((b) => b.id === a.id) === i);
     this.archive.sort((a, b) => a.valLoss - b.valLoss);
     if (this.archive.length > 12) this.archive.length = 12;
 
-    if (!this.bestEver || best.valLoss < this.bestEver.valLoss) {
-      this.bestEver = {
-        valLoss: best.valLoss, genome: { ...best.genome },
-        params: best.org.paramCount(), gen: this.gen, id: best.id, lineage: best.lineage,
-      };
-      this.sample = best.org.generate("One day, ", 300, this.vocab.stoi, this.vocab.itos, 0.85);
-      this.log("RECORD", "new best: #" + best.id + " scores " + best.valLoss.toFixed(3) +
-        " with " + best.org.paramCount() + " params (K" + best.genome.K +
-        " E" + best.genome.E + " H" + best.genome.H + ")", "#7cffb2");
+    if (championImproved || !previousChampion) {
+      this.sample = winner.org.generate("One day, ", 300, this.vocab.stoi, this.vocab.itos, 0.85);
+      this.log("RECORD", "new champion: #" + winner.id + " scores " + winner.valLoss.toFixed(3) +
+        " with " + winner.org.paramCount() + " params (K" + winner.genome.K +
+        " E" + winner.genome.E + " H" + winner.genome.H + ")", "#7cffb2");
+    } else if (previousChampion) {
+      this.log("RETAINED",
+        "champion #" + previousChampion.id + " retained at " + previousChampion.valLoss.toFixed(3) +
+        "; no child beat it this generation", "#ffd27c");
     }
 
     this.log("GEN " + this.gen,
       "best #" + best.id + " score " + best.valLoss.toFixed(3) + " | mean " + mean.toFixed(3) +
       " | " + best.org.paramCount() + " params - breeding next generation", "#6ee7ff");
 
-    // breed: elites reborn fresh + children of the best, mutated
+    // Breed: the reigning champion survives intact (already trained and
+    // scored), elite genomes are reborn fresh, and mutated children get
+    // a new lifetime of gradient descent.
     const next = [];
-    const elites = sorted.slice(0, this.eliteCount);
+    next.push(this.champion);
+    const elites = sorted
+      .filter((x) => x !== this.champion)
+      .slice(0, Math.max(0, this.eliteCount - 1));
     for (const e of elites) next.push(this.spawn({ ...e.genome }, e.id, e.lineage));
     const archGenomes = this.archive.map((a) => a.genome);
     while (next.length < this.popSize) {
@@ -212,6 +285,17 @@ export class EvolutionWorld {
       next.push(this.spawn(g, parent.id, parent.lineage));
     }
     this.population = next;
+    for (const p of this.population) p.champion = p === this.champion;
+    // Let the reigning champion keep learning next generation. Its
+    // snapshot is the safety net: continued training is accepted only
+    // if it improves the deterministic unseen-story score.
+    const champ = this.champion;
+    champ.isChampion = true;
+    champ.snapshot = snapshotOrganism(champ.org);
+    champ.preLifeScore = champ.valLoss;
+    champ.lifeImproved = false;
+    champ.step = 0;
+    champ.done = false;
     this.gen++;
     this.cursor = 0;
   }
@@ -228,3 +312,4 @@ export class EvolutionWorld {
     };
   }
 }
+
