@@ -255,8 +255,11 @@ export class EvolutionWorld {
     this.archive.sort((a, b) => a.valLoss - b.valLoss);
     if (this.archive.length > 12) this.archive.length = 12;
 
+    // Refresh the champion voice every generation, so the HUD always
+    // shows what the current champion says right now - new champion,
+    // self-improved champion, or retained champion.
+    this.sample = winner.org.generate("One day, ", 300, this.vocab.stoi, this.vocab.itos, 0.85);
     if (championImproved || !previousChampion) {
-      this.sample = winner.org.generate("One day, ", 300, this.vocab.stoi, this.vocab.itos, 0.85);
       this.log("RECORD", "new champion: #" + winner.id + " scores " + winner.valLoss.toFixed(3) +
         " with " + winner.org.paramCount() + " params (K" + winner.genome.K +
         " E" + winner.genome.E + " H" + winner.genome.H + ")", "#7cffb2");
