@@ -106,7 +106,9 @@ export class Organism {
   // ------------------------------------------------------------
   tryReplicate(world) {
     const g = this.genome;
-    if (world.organisms.length >= HARD_CAP) return null;
+    // hard ceiling: the lesser of the universe limit and the user's cap
+    const cap = Math.min(HARD_CAP, world.params.maxPopulation || HARD_CAP);
+    if (world.organisms.length >= cap) return null;
     if (this.age - this.lastRepro < world.params.divisionCooldown) return null;
 
     const threshold = 45 + g[GENE.THRESHOLD] * 70;

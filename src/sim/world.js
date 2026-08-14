@@ -27,6 +27,8 @@ export class World {
     this.env = { optimum: 0.5 };
     this.crowding = 1;
     this.milestones = new Set();
+    this.recordAge = 0;        // longest any cell has ever lived
+    this.recordChildren = 0;   // most children any cell has ever had
 
     // the learnable signal: drifting sines + noise. The predictable
     // part is what brains can learn; the noise sets the floor.
@@ -98,7 +100,12 @@ export class World {
     this.crowding = 1 + over * over * 2.2;
 
     // --- live, eat, maybe die ---
+    this.applySeparation(dt);
     for (const o of this.organisms) o.step(this, dt);
+    for (const o of this.organisms) {
+      if (!o.alive && o.age > this.recordAge) this.recordAge = o.age;
+      if (o.children > this.recordChildren) this.recordChildren = o.children;
+    }
     const before = this.organisms.length;
     this.organisms = this.organisms.filter((o) => o.alive);
     const deaths = before - this.organisms.length;
@@ -131,6 +138,25 @@ export class World {
 
     // --- population milestones ---
     this.milestonePop(50); this.milestonePop(150); this.milestonePop(300); this.milestonePop(600);
+
+    // --- story milestones ---
+    for (const o of this.organisms) {
+      if (o.genome[GENE.PREDATION] > 0.55) {
+        this.milestone("hunter", "the first hunter evolved - red cells now eat other cells", "#ff9c6e");
+        break;
+      }
+    }
+    if (this.organisms.length > 30) {
+      const counts = new Map();
+      for (const o of this.organisms) counts.set(o.lineage, (counts.get(o.lineage) || 0) + 1);
+      let topId = -1, topN = 0;
+      for (const [id, c] of counts) if (c > topN) { topN = c; topId = id; }
+      if (topN / this.organisms.length > 0.6) {
+        this.milestone("dom" + topId, "family #" + topId + " now dominates - " + Math.round((topN / this.organisms.length) * 100) + "% of all life", "#d99cff");
+      }
+    }
+    const cycle = Math.floor(this.time / 140);
+    if ((this.env.richness ?? 1) < 0.85) this.milestone("lean" + cycle, "a lean season began - food is scarce", "#ffd27c");
 
     // --- history sampling for the charts ---
     if (this.time - this.lastSample > 0.5) {
@@ -197,14 +223,62 @@ export class World {
         }
       }
     }
+    for (const o of this.organisms) {
+      if (!o.alive && o.age > this.recordAge) this.recordAge = o.age;
+    }
     const beforeP = this.organisms.length;
     this.organisms = this.organisms.filter((o) => o.alive);
     this.totalDeaths += beforeP - this.organisms.length;
   }
 
+  // ------------------------------------------------------------
+  // SEPARATION: cells gently push apart so the swarm stays
+  // readable instead of collapsing into one blob at the vent.
+  // Same spatial-hash trick as predation.
+  // ------------------------------------------------------------
+  applySeparation(dt) {
+    const cellSize = 2.4;
+    const cells = new Map();
+    const keyOf = (x, y, z) =>
+      Math.floor(x / cellSize) + "," + Math.floor(y / cellSize) + "," + Math.floor(z / cellSize);
+    for (const o of this.organisms) {
+      const k = keyOf(o.pos.x, o.pos.y, o.pos.z);
+      let arr = cells.get(k);
+      if (!arr) { arr = []; cells.set(k, arr); }
+      arr.push(o);
+    }
+    const R = 1.9, push = 3.2;
+    for (const o of this.organisms) {
+      let fx = 0, fy = 0, fz = 0;
+      const cx = Math.floor(o.pos.x / cellSize);
+      const cy = Math.floor(o.pos.y / cellSize);
+      const cz = Math.floor(o.pos.z / cellSize);
+      for (let dx = -1; dx <= 1; dx++)
+      for (let dy = -1; dy <= 1; dy++)
+      for (let dz = -1; dz <= 1; dz++) {
+        const arr = cells.get((cx + dx) + "," + (cy + dy) + "," + (cz + dz));
+        if (!arr) continue;
+        for (const q of arr) {
+          if (q === o) continue;
+          const rx = o.pos.x - q.pos.x;
+          const ry = o.pos.y - q.pos.y;
+          const rz = o.pos.z - q.pos.z;
+          const d2 = rx * rx + ry * ry + rz * rz;
+          if (d2 > R * R || d2 < 1e-8) continue;
+          const d = Math.sqrt(d2);
+          const f = (R - d) / (R * d);
+          fx += rx * f; fy += ry * f; fz += rz * f;
+        }
+      }
+      o.vel.x += fx * push * dt;
+      o.vel.y += fy * push * dt;
+      o.vel.z += fz * push * dt;
+    }
+  }
+
   milestonePop(n) {
     if (this.organisms.length >= n) {
-      this.milestone("pop" + n, `population reached ${n}`, "#7cc4ff");
+      this.milestone("pop" + n, "life is spreading - " + n + " cells alive", "#7cc4ff");
     }
   }
 
@@ -253,13 +327,30 @@ export class World {
     const orgs = this.organisms;
     const n = orgs.length || 1;
     let fid = 0, met = 0, skill = 0, energy = 0, best = null;
+    let hunters = 0, starving = 0;
+    let oldest = null, topParent = null, ageSum = 0;
+    const counts = new Map();
     for (const o of orgs) {
       fid += o.genome[GENE.FIDELITY];
       met += o.genome[GENE.METABOLISM];
       skill += o.brain.skill;
       energy += o.energy;
+      ageSum += o.age;
+      if (!oldest || o.age > oldest.age) oldest = o;
+      if (!topParent || o.children > topParent.children) topParent = o;
       if (!best || o.brain.skill > best.brain.skill) best = o;
+      if (o.genome[GENE.PREDATION] > 0.5) hunters++;
+      if (o.energy < 20) starving++;
+      counts.set(o.lineage, (counts.get(o.lineage) || 0) + 1);
     }
+    const lineageShares = [...counts.entries()]
+      .map(([id, count]) => ({ id, count, share: count / n }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
+    const richness = this.env.richness ?? 1;
+    const season = richness > 1.1 ? "good season (plenty of food)"
+      : richness < 0.9 ? "lean season (food is scarce)"
+      : "normal season";
     return {
       pop: orgs.length,
       births: this.totalBirths,
@@ -271,10 +362,21 @@ export class World {
       avgSkill: skill / n,
       avgEnergy: energy / n,
       optimum: this.env.optimum,
-      richness: this.env.richness ?? 1,
+      richness,
+      season,
+      hunters,
+      starving,
+      lineageShares,
       crowding: this.crowding,
       best,
       time: this.time,
+      avgAge: ageSum / n,
+      oldestAge: oldest ? oldest.age : 0,
+      oldestId: oldest ? oldest.id : null,
+      topChildren: topParent ? topParent.children : 0,
+      topParentId: topParent ? topParent.id : null,
+      recordAge: Math.max(this.recordAge, oldest ? oldest.age : 0),
+      recordChildren: Math.max(this.recordChildren, topParent ? topParent.children : 0),
     };
   }
 }

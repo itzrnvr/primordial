@@ -78,3 +78,100 @@ body { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; color: #
   position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
   font-size: 9px; letter-spacing: 1px; color: #4d5f7a; z-index: 10;
 }
+
+/* ---------- HUD v2: status, families, goals ---------- */
+.hud { width: 254px; }
+.status-line { font-size: 10px; color: #8ba3c4; margin: 8px 0 10px; letter-spacing: 0.5px; }
+.status-line b { color: #e8f2ff; font-size: 12px; }
+.fam-title { font-size: 9px; color: #6a7f9e; letter-spacing: 1px; margin-bottom: 4px; }
+.fam-bar { display: flex; height: 14px; border-radius: 4px; overflow: hidden; background: rgba(255,255,255,0.05); margin-bottom: 10px; }
+.fam-seg { height: 100%; min-width: 2px; }
+.fam-empty { width: 100%; text-align: center; font-size: 9px; color: #ff9c9c; line-height: 14px; letter-spacing: 1px; }
+.goals { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+.goal { background: rgba(255,255,255,0.035); border: 1px solid rgba(110,160,255,0.12); border-radius: 6px; padding: 6px 4px; text-align: center; cursor: help; }
+.goal-val { display: block; font-size: 13px; color: #7cffb2; }
+.goal-lab { display: block; font-size: 8px; color: #6a7f9e; letter-spacing: 0.3px; margin-top: 3px; line-height: 1.35; }
+.vitals { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 10px; }
+.vital { text-align: center; cursor: help; }
+.v-num { display: block; font-size: 12px; color: #e8f2ff; }
+.v-lab { display: block; font-size: 8px; color: #6a7f9e; letter-spacing: 1px; }
+.env-line { display: flex; justify-content: space-between; align-items: center; font-size: 9px; color: #8ba3c4; margin-bottom: 6px; letter-spacing: 0.5px; }
+.env-line b { color: #e8f2ff; }
+.env-chip { background: rgba(255,210,124,0.12); border: 1px solid rgba(255,210,124,0.3); color: #ffd27c; border-radius: 4px; padding: 2px 6px; font-size: 8px; letter-spacing: 0.5px; }
+.foresight { font-size: 10px; color: #8ba3c4; margin-bottom: 8px; cursor: help; letter-spacing: 0.5px; }
+.foresight b { color: #6ee7ff; font-size: 12px; }
+.foresight-sub { display: block; font-size: 8px; color: #4d5f7a; margin-top: 2px; letter-spacing: 0.3px; }
+.chart-caption { font-size: 8px; color: #4d5f7a; line-height: 1.5; margin-top: 4px; letter-spacing: 0.3px; }
+
+/* ---------- control tooltips ---------- */
+.panel-hint { display: block; font-size: 8px; color: #4d5f7a; letter-spacing: 0.5px; margin-top: 2px; font-weight: normal; }
+.slider-label { position: relative; cursor: help; }
+.tip {
+  display: none;
+  position: absolute;
+  top: calc(100% + 8px);
+  right: -8px;
+  width: 218px;
+  padding: 9px 11px;
+  background: rgba(6, 10, 20, 0.97);
+  border: 1px solid rgba(110, 231, 255, 0.35);
+  border-radius: 8px;
+  font-size: 10px;
+  line-height: 1.55;
+  color: #cfe0f4;
+  letter-spacing: 0.2px;
+  z-index: 60;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+  white-space: normal;
+}
+.slider-label:hover .tip, .slider-label:focus .tip { display: block; }
+
+/* ---------- help / legend panel ---------- */
+.help { top: 14px; left: 50%; transform: translateX(-50%); width: 390px; text-align: left; }
+.help-closed { width: auto; }
+.help-toggle { background: none; border: none; color: #6ee7ff; font-family: inherit; font-size: 10px; letter-spacing: 1.5px; cursor: pointer; padding: 0; }
+.help-body p { font-size: 10px; line-height: 1.6; color: #9fb4d8; margin: 8px 0; }
+.help-body b { color: #e8f2ff; }
+.help-body .c-sun { color: #ffb45e; }
+.help-body ul { margin: 8px 0 2px; padding: 0; list-style: none; }
+.help-body li { font-size: 10px; color: #9fb4d8; margin: 4px 0; display: flex; align-items: center; gap: 7px; }
+.sw { display: inline-block; width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.sw-family { background: #6ee7ff; }
+.sw-red { background: #ff5040; }
+.sw-dim { background: #2c3a52; }
+.sw-flash { background: #ffffff; box-shadow: 0 0 6px #fff; }
+
+/* ---------- inspector extras ---------- */
+.gene { cursor: help; }
+.gene-hint { font-size: 8px; color: #4d5f7a; margin-top: 6px; letter-spacing: 0.5px; }
+/* ---------- mode switch ---------- */
+.mode-switch { display: flex; gap: 6px; margin-bottom: 12px; }
+.mode-switch button {
+  flex: 1; padding: 8px 0; font-family: inherit; font-size: 10px; letter-spacing: 1.5px;
+  background: rgba(255,255,255,0.03); color: #6a7f9e;
+  border: 1px solid rgba(110,160,255,0.15); border-radius: 6px; cursor: pointer;
+}
+.mode-switch button.active {
+  background: rgba(110,231,255,0.14); color: #6ee7ff;
+  border-color: rgba(110,231,255,0.45);
+}
+.mode-note { font-size: 9px; line-height: 1.6; color: #6a7f9e; margin: 6px 0 10px; letter-spacing: 0.3px; }
+
+/* ---------- organism HUD ---------- */
+.lingua { width: 330px; }
+.lingua .status-line b { color: #7cffb2; }
+.c-green { color: #7cffb2; }
+.c-orange { color: #ffb45e; }
+.lingua-loss { margin: 6px 0 8px; }
+.lingua-loss-row { display: flex; justify-content: space-between; font-size: 10px; color: #8ba3c4; margin: 3px 0; letter-spacing: 0.4px; }
+.lingua-loss-row b { font-size: 12px; }
+.lingua-loss-note { font-size: 8px; color: #4d5f7a; margin-top: 4px; letter-spacing: 0.3px; }
+.loss-canvas { width: 100%; background: rgba(255,255,255,0.025); border-radius: 4px; display: block; margin-bottom: 10px; }
+.lingua-sample-title { font-size: 9px; color: #6a7f9e; letter-spacing: 1px; margin-bottom: 5px; }
+.lingua-sample {
+  font-size: 10.5px; line-height: 1.55; color: #d7e6f8;
+  background: rgba(0,0,0,0.35); border: 1px solid rgba(110,160,255,0.14);
+  border-radius: 6px; padding: 9px 11px; min-height: 92px; max-height: 150px;
+  overflow: hidden; white-space: pre-wrap; word-break: break-word; margin-bottom: 10px;
+}

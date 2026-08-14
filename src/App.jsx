@@ -1,10 +1,13 @@
 import { useEffect } from "react";
 import Scene from "./render/Scene.jsx";
 import HUD from "./ui/HUD.jsx";
+import LinguaHUD from "./ui/LinguaHUD.jsx";
 import Controls from "./ui/Controls.jsx";
 import EventFeed from "./ui/EventFeed.jsx";
 import Inspector from "./ui/Inspector.jsx";
+import Help from "./ui/Help.jsx";
 import { useStore } from "./state/store.js";
+import { initLingua } from "./sim/lingua-runtime.js";
 
 export default function App() {
   const select = useStore((s) => s.select);
@@ -12,6 +15,7 @@ export default function App() {
   const togglePause = useStore((s) => s.togglePause);
   const reset = useStore((s) => s.reset);
   const meteor = useStore((s) => s.meteor);
+  const mode = useStore((s) => s.mode);
 
   // slow UI tick so the HUD numbers stay live
   useEffect(() => {
@@ -19,27 +23,39 @@ export default function App() {
     return () => clearInterval(id);
   }, [bumpTick]);
 
+  // load TinyStories the first time organism mode is opened
+  useEffect(() => {
+    if (mode === "organism") initLingua();
+  }, [mode]);
+
   // keyboard: space pause, R reset, M meteor, Esc deselect
   useEffect(() => {
     const onKey = (e) => {
       if (e.code === "Space") { e.preventDefault(); togglePause(); }
-      else if (e.key === "r" || e.key === "R") reset();
-      else if (e.key === "m" || e.key === "M") meteor();
+      else if (e.key === "r" || e.key === "R") { if (mode === "ecosystem") reset(); }
+      else if (e.key === "m" || e.key === "M") { if (mode === "ecosystem") meteor(); }
       else if (e.key === "Escape") select(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [togglePause, reset, meteor, select]);
+  }, [togglePause, reset, meteor, select, mode]);
 
   return (
     <div className="app">
       <Scene onSelect={select} />
-      <HUD />
+      {mode === "ecosystem" ? (
+        <>
+          <HUD />
+          <Inspector />
+          <Help />
+        </>
+      ) : (
+        <LinguaHUD />
+      )}
       <Controls />
       <EventFeed />
-      <Inspector />
       <div className="hint">
-        drag to orbit - scroll to zoom - click a cell to inspect - [space] pause - [m] meteor - [r] reset
+        drag to orbit - scroll to zoom{mode === "ecosystem" ? " - click a cell to inspect" : ""} - [space] pause
       </div>
     </div>
   );

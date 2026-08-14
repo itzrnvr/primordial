@@ -31,7 +31,7 @@ export default function Organisms({ onSelect }) {
     const n = Math.min(orgs.length, HARD_CAP);
     for (let i = 0; i < n; i++) {
       const o = orgs[i];
-      const r = 0.42 + o.genome[GENE.SIZE] * 0.72 + Math.min(o.energy, 160) / 500;
+      const r = 0.34 + o.genome[GENE.SIZE] * 0.6 + Math.min(o.energy, 160) / 550;
       dummy.position.set(o.pos.x, o.pos.y, o.pos.z);
       dummy.scale.setScalar(r * (1 + o.flash * 0.85));
       dummy.updateMatrix();
@@ -39,7 +39,9 @@ export default function Organisms({ onSelect }) {
       tmp.copy(lineageColor(o.lineage));
       const pk = o.genome[GENE.PREDATION];
       if (pk > 0.3) tmp.lerp(RED, Math.min(1, (pk - 0.3) * 1.1)); // hunters glow red
-      if (o.flash > 0) tmp.lerp(WHITE, Math.min(1, o.flash) * 0.75);
+      const fed = Math.min(1, Math.max(0.18, o.energy / 110));
+      tmp.multiplyScalar(0.4 + 0.6 * fed);                        // starving = dim, fed = bright
+      if (o.flash > 0) tmp.lerp(WHITE, Math.min(1, o.flash) * 0.8); // birth flash
       mesh.setColorAt(i, tmp);
     }
     mesh.count = n;

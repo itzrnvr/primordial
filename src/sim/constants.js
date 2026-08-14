@@ -3,8 +3,8 @@
 // Every number here is a knob you can play with.
 // ============================================================
 
-export const WORLD_RADIUS = 30;      // size of the universe (soft wall)
-export const VENT_RADIUS = 10;       // how far the nutrient vent's glow reaches
+export const WORLD_RADIUS = 40;      // size of the universe (soft wall)
+export const VENT_RADIUS = 13;       // how far the nutrient vent's glow reaches
 export const HARD_CAP = 700;         // universe density limit (perf guard)
 export const SOFT_CAP = 320;         // crowding starts here (upkeep rises)
 
@@ -51,4 +51,5 @@ export const DEFAULTS = {
   exploreProb: 0.28,      // chance a mutation is pure exploration instead of informed
   informedBlend: 0.65,    // how strongly informed mutations lean on lineage memory
   brainSignalNoise: 0.12, // noise on the environmental signal the brain must learn
+  maxPopulation: 700,     // user-adjustable cap on how many organisms may exist
 };

@@ -22,10 +22,9 @@ export function Spark({ data, color, min, max, height = 34, label, value }) {
   useEffect(() => {
     const c = ref.current;
     if (!c) return;
-    const w = c.width, h = c.height;
     const ctx = c.getContext("2d");
-    ctx.clearRect(0, 0, w, h);
-    drawSeries(ctx, w, h, data, color, min, max);
+    ctx.clearRect(0, 0, c.width, c.height);
+    drawSeries(ctx, c.width, c.height, data, color, min, max);
   });
   return (
     <div className="chart">
@@ -38,29 +37,22 @@ export function Spark({ data, color, min, max, height = 34, label, value }) {
   );
 }
 
-// The adaptation chart: average metabolism (what the population IS)
-// vs the drifting optimum (what the environment WANTS). Watching
-// the cyan line chase the orange line is watching evolution happen.
+// The adaptation race: average metabolism gene (cyan) vs the drifting
+// environment optimum (orange). Explained by the caption in the HUD.
 export function AdaptChart({ height = 46 }) {
   const ref = useRef();
   useEffect(() => {
     const c = ref.current;
     if (!c) return;
-    const w = c.width, h = c.height;
     const ctx = c.getContext("2d");
-    ctx.clearRect(0, 0, w, h);
+    ctx.clearRect(0, 0, c.width, c.height);
     const H = world.history;
-    drawSeries(ctx, w, h, H.metabolism, "#6ee7ff", 0, 1);
-    drawSeries(ctx, w, h, H.optimum, "#ffb45e", 0, 1);
+    drawSeries(ctx, c.width, c.height, H.metabolism, "#6ee7ff", 0, 1);
+    drawSeries(ctx, c.width, c.height, H.optimum, "#ffb45e", 0, 1);
   });
   return (
     <div className="chart">
-      <div className="chart-label">
-        <span>adaptation</span>
-        <span className="chart-value">
-          <i className="dot cyan" /> avg gene <i className="dot orange" /> env optimum
-        </span>
-      </div>
+      <div className="chart-label"><span>adaptation</span></div>
       <canvas ref={ref} width={190} height={height} />
     </div>
   );
