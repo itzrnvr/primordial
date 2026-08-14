@@ -34,8 +34,8 @@ const LR_LO = 0.008, LR_HI = 0.25;
 function pick(arr) { return arr[Math.floor(rng() * arr.length)]; }
 function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
 
-export function randomGenome() {
-  return { K: pick(KGRID), E: pick(EGRID), H: pick(HGRID), lr: 0.02 + rng() * 0.12 };
+export function randomGenome(senses = true) {
+  return { K: pick(KGRID), E: pick(EGRID), H: pick(HGRID), lr: 0.02 + rng() * 0.12, sb: senses && rng() < 0.5 ? 1 : 0, sp: senses && rng() < 0.5 ? 1 : 0 };
 }
 
 function nudgeGrid(val, grid) {
@@ -48,20 +48,24 @@ function nudgeGrid(val, grid) {
 
 // Small mutations of a genome. jumpRate gives one gene a full
 // random redraw (the escape hatch from local optima).
-export function mutateGenome(g, mutRate, jumpRate) {
+export function mutateGenome(g, mutRate, jumpRate, senses = true) {
   const c = { K: g.K, E: g.E, H: g.H, lr: g.lr };
-  const jumpGene = rng() < jumpRate ? Math.floor(rng() * 4) : -1;
+  const jumpGene = rng() < jumpRate ? Math.floor(rng() * 6) : -1;
   if (jumpGene === 0) c.K = pick(KGRID); else if (rng() < mutRate) c.K = nudgeGrid(c.K, KGRID);
   if (jumpGene === 1) c.E = pick(EGRID); else if (rng() < mutRate) c.E = nudgeGrid(c.E, EGRID);
   if (jumpGene === 2) c.H = pick(HGRID); else if (rng() < mutRate) c.H = nudgeGrid(c.H, HGRID);
   if (jumpGene === 3) c.lr = 0.02 + rng() * 0.12;
   else if (rng() < mutRate) c.lr = clamp(c.lr * Math.exp((rng() + rng() - 1) * 0.5), LR_LO, LR_HI);
+  if (senses) {
+    if (jumpGene === 4) c.sb = c.sb ? 0 : 1; else if (rng() < mutRate) c.sb = c.sb ? 0 : 1;
+    if (jumpGene === 5) c.sp = c.sp ? 0 : 1; else if (rng() < mutRate) c.sp = c.sp ? 0 : 1;
+  }
   return c;
 }
 
 // Informed breeding: start from a parent, sometimes splice in a
 // gene from another proven genome (recombination), then mutate.
-export function breedGenome(parent, archiveGenomes, mutRate, jumpRate) {
+export function breedGenome(parent, archiveGenomes, mutRate, jumpRate, senses = true) {
   const c = { ...parent };
   if (archiveGenomes.length > 1 && rng() < 0.3) {
     const other = archiveGenomes[Math.floor(rng() * archiveGenomes.length)];
@@ -69,8 +73,10 @@ export function breedGenome(parent, archiveGenomes, mutRate, jumpRate) {
     if (rng() < 0.5) c.E = other.E;
     if (rng() < 0.5) c.H = other.H;
     if (rng() < 0.5) c.lr = (c.lr + other.lr) / 2;
+    if (senses && rng() < 0.5) c.sb = other.sb;
+    if (senses && rng() < 0.5) c.sp = other.sp;
   }
-  return mutateGenome(c, mutRate, jumpRate);
+  return mutateGenome(c, mutRate, jumpRate, senses);
 }
 
 function snapshotOrganism(o) {
@@ -102,6 +108,8 @@ export class EvolutionWorld {
     this.stepsPerGen = opts.stepsPerGen ?? 320;   // lifetime training budget
     this.eliteCount = Math.min(2, this.popSize - 1);
     this.params = { mutationRate: 0.55, jumpRate: 0.08 };
+    this.senses = opts.senses ?? true;
+    this.spaceId = this.vocab.stoi[" "] ?? 0;
 
     // Fixed honest pool and a fixed evaluation subset. The subset is
     // deterministic, so the same trained organism always receives the
@@ -129,7 +137,7 @@ export class EvolutionWorld {
 
     this.population = [];
     for (let i = 0; i < this.popSize; i++) {
-      const ind = this.spawn(randomGenome(), 0, 0);
+      const ind = this.spawn(randomGenome(this.senses), 0, 0);
       ind.lineage = ind.id;
       this.population.push(ind);
     }
@@ -145,7 +153,7 @@ export class EvolutionWorld {
   }
 
   spawn(genome, parentId, lineage) {
-    const org = new LinguaOrganism(this.vocab.V, genome.E, genome.K, genome.H, genome.lr);
+    const org = new LinguaOrganism(this.vocab.V, genome.E, genome.K, genome.H, genome.lr, { spaceId: this.spaceId, fb: genome.sb === 1, fp: genome.sp === 1 });
     return {
       id: this.nextId++, genome, org, parentId, lineage,
       step: 0, trainEMA: this.lnV, valLoss: null, done: false,
@@ -285,7 +293,7 @@ export class EvolutionWorld {
     const archGenomes = this.archive.map((a) => a.genome);
     while (next.length < this.popSize) {
       const parent = rng() < 0.7 ? elites[0] : sorted[Math.floor(rng() * sorted.length)];
-      const g = breedGenome(parent.genome, archGenomes, this.params.mutationRate, this.params.jumpRate);
+      const g = breedGenome(parent.genome, archGenomes, this.params.mutationRate, this.params.jumpRate, this.senses);
       next.push(this.spawn(g, parent.id, parent.lineage));
     }
     this.population = next;
@@ -320,7 +328,7 @@ export class EvolutionWorld {
         championGen: c.championGen ?? this.gen,
         w: {
           emb: f32ToB64(c.org.emb), W1: f32ToB64(c.org.W1), b1: f32ToB64(c.org.b1),
-          W2: f32ToB64(c.org.W2), b2: f32ToB64(c.org.b2),
+          W2: f32ToB64(c.org.W2), b2: f32ToB64(c.org.b2), Wf: f32ToB64(c.org.Wf),
         },
       } : null,
     };
@@ -337,8 +345,10 @@ export class EvolutionWorld {
     const b1 = b64ToF32(w.b1, o.b1.length);
     const W2 = b64ToF32(w.W2, o.W2.length);
     const b2 = b64ToF32(w.b2, o.b2.length);
+    const Wf = o.Wf.length ? b64ToF32(w.Wf, o.Wf.length) : null;
+    if (o.Wf.length && !Wf) return false;
     if (!emb || !W1 || !b1 || !W2 || !b2) return false;
-    o.emb.set(emb); o.W1.set(W1); o.b1.set(b1); o.W2.set(W2); o.b2.set(b2);
+    o.emb.set(emb); o.W1.set(W1); o.b1.set(b1); o.W2.set(W2); o.b2.set(b2); if (Wf) o.Wf.set(Wf);
 
     ind.id = d.champion.id;
     ind.valLoss = d.champion.valLoss;
@@ -368,7 +378,7 @@ export class EvolutionWorld {
         ? archGenomes[Math.floor(rng() * archGenomes.length)]
         : g;
       pop.push(this.spawn(
-        breedGenome(parentGenome, archGenomes, this.params.mutationRate, this.params.jumpRate),
+        breedGenome(parentGenome, archGenomes, this.params.mutationRate, this.params.jumpRate, this.senses),
         ind.id, ind.lineage
       ));
     }

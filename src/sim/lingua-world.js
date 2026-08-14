@@ -60,7 +60,7 @@ export class LinguaWorld {
     this.validAtLastGrowth = lnV;
     this.stepsSinceGrowth = 0;
     this.patience = opts.patience ?? 150;   // min steps between growth decisions
-    this.minDelta = 0.004;                  // improvement needed to keep not-growing
+    this.minDelta = opts.minDelta ?? 0.02;    // improvement needed to keep not-growing (tuned for the full corpus)
     this.capped = false;
     this.flash = 0;
 
@@ -240,3 +240,5 @@ export class LinguaWorld {
     };
   }
 }
+
+
