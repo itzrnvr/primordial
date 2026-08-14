@@ -1,0 +1,80 @@
+* { box-sizing: border-box; }
+html, body, #root { margin: 0; height: 100%; overflow: hidden; background: #030409; }
+body { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; color: #cfe0f4; }
+
+.app { position: fixed; inset: 0; }
+.app canvas { display: block; }
+
+.panel {
+  position: absolute;
+  background: rgba(7, 11, 22, 0.72);
+  border: 1px solid rgba(110, 160, 255, 0.16);
+  border-radius: 10px;
+  padding: 12px 14px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+  z-index: 10;
+  user-select: none;
+}
+
+/* ---------- HUD (top-left) ---------- */
+.hud { top: 14px; left: 14px; width: 240px; }
+.title {
+  font-size: 15px; letter-spacing: 3px; color: #7cffb2;
+  text-shadow: 0 0 14px rgba(124, 255, 178, 0.5);
+}
+.title .sub { display: block; font-size: 9px; letter-spacing: 2px; color: #6a7f9e; margin-top: 2px; }
+.statgrid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px;
+  margin: 10px 0; font-size: 9px; color: #6a7f9e; letter-spacing: 1px;
+}
+.statgrid b { display: block; font-size: 13px; color: #e8f2ff; letter-spacing: 0; }
+.charts { display: flex; flex-direction: column; gap: 8px; }
+.chart canvas { display: block; width: 100%; background: rgba(255,255,255,0.025); border-radius: 4px; }
+.chart-label { display: flex; justify-content: space-between; font-size: 9px; color: #6a7f9e; letter-spacing: 1px; margin-bottom: 3px; }
+.chart-value { color: #9fb4d8; }
+.dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin: 0 3px 0 6px; }
+.dot.cyan { background: #6ee7ff; }
+.dot.orange { background: #ffb45e; }
+
+/* ---------- Controls (top-right) ---------- */
+.controls { top: 14px; right: 14px; width: 230px; }
+.panel-title { font-size: 11px; letter-spacing: 2px; color: #9fb4d8; margin-bottom: 10px; }
+.slider { display: block; margin-bottom: 9px; }
+.slider-label { display: flex; justify-content: space-between; font-size: 10px; color: #8ba3c4; letter-spacing: 1px; }
+.slider-label em { color: #e8f2ff; font-style: normal; }
+.slider input { width: 100%; accent-color: #6ee7ff; margin-top: 3px; }
+.buttons { display: flex; gap: 6px; margin-top: 10px; }
+.buttons button {
+  flex: 1; padding: 7px 0; font-family: inherit; font-size: 10px; letter-spacing: 2px;
+  background: rgba(110, 231, 255, 0.1); color: #cfe0f4;
+  border: 1px solid rgba(110, 231, 255, 0.3); border-radius: 6px; cursor: pointer;
+}
+.buttons button:hover { background: rgba(110, 231, 255, 0.22); }
+.buttons button.danger { border-color: rgba(255, 124, 124, 0.4); color: #ff9c9c; background: rgba(255, 124, 124, 0.08); }
+.buttons button.danger:hover { background: rgba(255, 124, 124, 0.2); }
+
+/* ---------- Event feed (bottom-left) ---------- */
+.feed { bottom: 34px; left: 14px; width: 340px; font-size: 10px; }
+.feed-row { display: flex; gap: 8px; margin: 3px 0; white-space: nowrap; }
+.feed-t { color: #4d5f7a; }
+.feed-type { font-weight: bold; letter-spacing: 1px; min-width: 84px; }
+.feed-msg { color: #9fb4d8; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- Inspector (bottom-right) ---------- */
+.inspector { bottom: 34px; right: 14px; width: 250px; }
+.inspector .gen { color: #6a7f9e; font-size: 10px; margin-left: 6px; }
+.ins-row { display: flex; justify-content: space-between; font-size: 10px; color: #8ba3c4; margin: 3px 0; letter-spacing: 1px; }
+.ins-row b { color: #e8f2ff; }
+.genome { margin-top: 10px; border-top: 1px solid rgba(110,160,255,0.14); padding-top: 8px; }
+.gene { display: grid; grid-template-columns: 86px 1fr 34px; align-items: center; gap: 6px; margin: 4px 0; font-size: 9px; }
+.gene-name { color: #8ba3c4; letter-spacing: 1px; }
+.gene-bar { height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; }
+.gene-fill { height: 100%; background: linear-gradient(90deg, #2b7fff, #6ee7ff); border-radius: 3px; }
+.gene-val { color: #e8f2ff; text-align: right; }
+
+/* ---------- Hint bar ---------- */
+.hint {
+  position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
+  font-size: 9px; letter-spacing: 1px; color: #4d5f7a; z-index: 10;
+}

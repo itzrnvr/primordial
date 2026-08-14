@@ -1,0 +1,30 @@
+{
+  "name": "primordial",
+  "private": true,
+  "version": "0.1.0",
+  "description": "A digital origin-of-life simulator: self-replicating organisms evolving under energy constraints, rendered live in 3D.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "@react-three/drei": "^9.99.0",
+    "@react-three/fiber": "^8.15.16",
+    "@react-three/postprocessing": "^2.16.2",
+    "postprocessing": "^6.35.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "three": "^0.170.0",
+    "zustand": "^4.5.2"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.2.1",
+    "vite": "^5.1.6"
+  },
+  "allowScripts": {
+    "esbuild@0.21.5": true
+  }
+}
