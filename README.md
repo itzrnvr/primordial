@@ -136,3 +136,21 @@ public/data/      TinyStories train/valid slices (~6 MB / ~1.5 MB)
 - Anything predefined is listed in one place, and the roadmap exists to
   shrink that list.
 
+
+## Persistence (PostgreSQL)
+
+Progress lives in PostgreSQL, not in the tab: every mode autosaves every
+5 seconds and on tab-hide/close, and loads server-first on startup. Close
+the browser, reboot, come back next week - the colony, the organism and the
+champion are where you left them.
+
+Connection priority: `DATABASE_URL` from the environment, then the
+gitignored `.env` file, then an embedded Postgres (binaries from npm, no
+Docker) started on demand with its data in `.pgdata/`. Example `.env`:
+
+```
+DATABASE_URL=postgres://user:pass@127.0.0.1:5433/primordial
+```
+
+The reset buttons delete the server row too, so reset still means a truly
+fresh universe.

@@ -41,3 +41,30 @@ export function loadJSON(key) {
 export function clearKey(key) {
   try { localStorage.removeItem(key); } catch { /* ignore */ }
 }
+
+// ---- server (PostgreSQL) persistence ----
+// The server keeps the canonical copy; localStorage is only a
+// quick offline cache. Fire-and-forget saves: the sim never waits.
+
+export async function serverLoad(slot) {
+  try {
+    const r = await fetch("/api/state/" + slot);
+    if (!r.ok) return null;
+    const j = await r.json();
+    return j.data ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function serverSave(slot, obj) {
+  try {
+    fetch("/api/state/" + slot, { method: "PUT", body: JSON.stringify(obj) }).catch(() => {});
+  } catch { /* ignore */ }
+}
+
+export function serverDelete(slot) {
+  try {
+    fetch("/api/state/" + slot, { method: "DELETE" }).catch(() => {});
+  } catch { /* ignore */ }
+}

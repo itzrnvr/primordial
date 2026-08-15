@@ -1,9 +1,10 @@
 import { EvolutionWorld } from "./evolve.js";
-import { saveJSON, loadJSON, clearKey } from "./persist.js";
+import { saveJSON, loadJSON, clearKey, serverLoad, serverSave, serverDelete } from "./persist.js";
 
 // Runtime for the evolution mode: fetches TinyStories once, holds the
-// world, and autosaves it so a refresh keeps the champion and history.
-const EVO_KEY = "primordial.evo.v1";
+// world, and autosaves to PostgreSQL (with a localStorage cache) so
+// closing the tab loses nothing.
+const EVO_KEY = "primordial.evo.v2";
 
 let trainText = null;
 let validText = null;
@@ -15,7 +16,12 @@ let autosaveOn = false;
 function startAutosave() {
   if (autosaveOn) return;
   autosaveOn = true;
-  const save = () => { if (evolveWorld) saveJSON(EVO_KEY, evolveWorld.toSave()); };
+  const save = () => {
+    if (!evolveWorld) return;
+    const data = evolveWorld.toSave();
+    saveJSON(EVO_KEY, data);
+    serverSave("evolve", data);
+  };
   setInterval(save, 5000);
   window.addEventListener("beforeunload", save);
   document.addEventListener("visibilitychange", () => {
@@ -34,8 +40,9 @@ export async function initEvolve() {
     trainText = t;
     validText = v;
     evolveWorld = new EvolutionWorld(trainText, validText);
-    const saved = loadJSON(EVO_KEY);
-    if (saved) evolveWorld.applySave(saved); // corrupt save -> fresh start
+    const remote = await serverLoad("evolve");
+    const saved = remote ?? loadJSON(EVO_KEY);
+    if (saved) evolveWorld.applySave(saved);
     evolveState = "ready";
     startAutosave();
   } catch (e) {
@@ -46,5 +53,6 @@ export async function initEvolve() {
 
 export function resetEvolve() {
   clearKey(EVO_KEY);
+  serverDelete("evolve");
   if (trainText) evolveWorld = new EvolutionWorld(trainText, validText);
 }

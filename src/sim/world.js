@@ -7,6 +7,7 @@
 import { GENE, GENE_COUNT, DEFAULTS, SOFT_CAP, HARD_CAP } from "./constants.js";
 import { Organism, peekNextId, bumpIdTo } from "./organism.js";
 import { seedGenome, reseed, gauss, rng } from "./genome.js";
+import { serverLoad, serverSave, serverDelete } from "./persist.js";
 
 export class World {
   constructor() {
@@ -447,9 +448,11 @@ export class World {
 
 export const world = new World();
 
-const ECO_KEY = "primordial.eco.v1";
+const ECO_KEY = "primordial.eco.v2";
 export function saveEco() {
-  try { localStorage.setItem(ECO_KEY, JSON.stringify(world.toSave())); } catch { /* ignore */ }
+  const data = world.toSave();
+  try { localStorage.setItem(ECO_KEY, JSON.stringify(data)); } catch { /* ignore */ }
+  serverSave("eco", data);
 }
 export function loadEco() {
   try {
@@ -458,7 +461,15 @@ export function loadEco() {
   } catch { /* ignore */ }
   return false;
 }
+// server-first load: the PostgreSQL copy is canonical
+export async function loadEcoBest() {
+  const remote = await serverLoad("eco");
+  if (remote && world.applySave(remote)) return true;
+  return loadEco();
+}
 export function clearEco() {
   try { localStorage.removeItem(ECO_KEY); } catch { /* ignore */ }
+  serverDelete("eco");
 }
+
 

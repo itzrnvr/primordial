@@ -417,7 +417,12 @@ export class EvolutionWorld {
   }
 
   applySave(d) {
-    if (!d || d.v !== 2 || !d.champion) return false;
+    if (!d || (d.v !== 1 && d.v !== 2) || !d.champion) return false;
+    // migrate older saves: new genes get sane defaults
+    d.champion.genome.sw = d.champion.genome.sw ?? 0;
+    d.champion.genome.cur = d.champion.genome.cur ?? 0;
+    d.champion.genome.mo = d.champion.genome.mo ?? 0;
+    d.champion.genome.lm = d.champion.genome.lm ?? 1;
     const g = d.champion.genome;
     const ind = this.spawn(g, 0, d.champion.lineage);
     const o = ind.org;
@@ -497,3 +502,4 @@ export class EvolutionWorld {
     };
   }
 }
+

@@ -1,9 +1,9 @@
 import { LinguaWorld } from "./lingua-world.js";
-import { saveJSON, loadJSON, clearKey } from "./persist.js";
+import { saveJSON, loadJSON, clearKey, serverLoad, serverSave, serverDelete } from "./persist.js";
 
 // Runtime for the organism mode: fetches TinyStories once, holds the
-// world, and autosaves it so a refresh keeps the organism's learning.
-const LINGUA_KEY = "primordial.lingua.v1";
+// world, and autosaves to PostgreSQL (with a localStorage cache).
+const LINGUA_KEY = "primordial.lingua.v2";
 
 let trainText = null;
 let validText = null;
@@ -15,7 +15,12 @@ let autosaveOn = false;
 function startAutosave() {
   if (autosaveOn) return;
   autosaveOn = true;
-  const save = () => { if (linguaWorld) saveJSON(LINGUA_KEY, linguaWorld.toSave()); };
+  const save = () => {
+    if (!linguaWorld) return;
+    const data = linguaWorld.toSave();
+    saveJSON(LINGUA_KEY, data);
+    serverSave("lingua", data);
+  };
   setInterval(save, 5000);
   window.addEventListener("beforeunload", save);
   document.addEventListener("visibilitychange", () => {
@@ -34,7 +39,8 @@ export async function initLingua() {
     trainText = t;
     validText = v;
     linguaWorld = new LinguaWorld(trainText, validText);
-    const saved = loadJSON(LINGUA_KEY);
+    const remote = await serverLoad("lingua");
+    const saved = remote ?? loadJSON(LINGUA_KEY);
     if (saved) linguaWorld.applySave(saved);
     linguaState = "ready";
     startAutosave();
@@ -46,5 +52,6 @@ export async function initLingua() {
 
 export function resetLingua() {
   clearKey(LINGUA_KEY);
+  serverDelete("lingua");
   if (trainText) linguaWorld = new LinguaWorld(trainText, validText);
 }
